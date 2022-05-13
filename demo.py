@@ -82,32 +82,25 @@ def demo_torch():
     p = torch.from_numpy(np.array([
         [155, 30], [155, 125], [155, 225],
         [235, 100], [235, 160], [295, 85], [293, 180]
-    ])).to(device)
+    ], dtype='float32'))
     q = torch.from_numpy(np.array([
         [211, 42], [155, 125], [100, 235],
         [235, 80], [235, 140], [295, 85], [295, 180]
-    ])).to(device)
+    ], dtype='float32'))
 
     image = torch.from_numpy(np.array(Image.open("images/toy.jpg"))).to(device)
 
     height, width, _ = image.shape
-    gridX = torch.arange(width, dtype=torch.int16).to(device)
-    gridY = torch.arange(height, dtype=torch.int16).to(device)
-    vy, vx = torch.meshgrid(gridX, gridY)
-    # !!! Pay attention !!!: the shape of returned tensors are different between numpy.meshgrid and torch.meshgrid
-    vy, vx = vy.transpose(0, 1), vx.transpose(0, 1)
-
+    vx = torch.arange(height, dtype=torch.float32, device=device)
+    vy = torch.arange(width, dtype=torch.float32, device=device).reshape((1, -1))
     affine = mls_affine_deformation_pt(vy, vx, p, q, alpha=1)
-    aug1 = torch.ones_like(image).to(device)
-    aug1[vx.long(), vy.long()] = image[tuple(affine)]
+    aug1 = image[affine[..., 0], affine[..., 1]]
 
     similar = mls_similarity_deformation_pt(vy, vx, p, q, alpha=1)
-    aug2 = torch.ones_like(image).to(device)
-    aug2[vx.long(), vy.long()] = image[tuple(similar)]
+    aug2 = image[similar[..., 0], similar[..., 1]]
 
     rigid = mls_rigid_deformation_pt(vy, vx, p, q, alpha=1)
-    aug3 = torch.ones_like(image).to(device)
-    aug3[vx.long(), vy.long()] = image[tuple(rigid)]
+    aug3 = image[rigid[..., 0], rigid[..., 1]]
 
     fig, ax = plt.subplots(1, 4, figsize=(12, 4))
     ax[0].imshow(image)
@@ -248,7 +241,7 @@ def benchmark_numpy(image, p, q):
     height, width = image.shape[:2]
 
     # Define deformation grid
-    vx, vy = np.mgrid[:height - 1:height * 1j, :width - 1:width * 1j]
+    vx, vy = np.ogrid[:height - 1:height * 1j, :width - 1:width * 1j]
 
     rigid = mls_rigid_deformation(vy, vx, p, q, alpha=1)
     aug = image[rigid[..., 0], rigid[..., 1]]
@@ -258,16 +251,13 @@ def benchmark_numpy(image, p, q):
 
 def benchmark_torch(image, p, q):
     height, width = image.shape[:2]
-    device = image.device
 
     # Define deformation grid
-    gridX = torch.arange(width, dtype=torch.int16).to(device)
-    gridY = torch.arange(height, dtype=torch.int16).to(device)
-    vy, vx = torch.meshgrid(gridX, gridY)
+    vx = torch.arange(height, dtype=torch.float32, device=device)
+    vy = torch.arange(width, dtype=torch.float32, device=device).reshape((1, -1))
 
     rigid = mls_rigid_deformation_pt(vy, vx, p, q, alpha=1)
-    aug = torch.ones_like(image).to(device)
-    aug[vx.long(), vy.long()] = image[rigid[0], rigid[1]]
+    aug = image[rigid[..., 0], rigid[..., 1]]
     return aug
 
 
@@ -286,10 +276,7 @@ def run_benckmark(i):
     for _ in range(3):
         image = np.random.randint(0, 256, sizes[i])
         height, width = image.shape[:2]
-        p = np.stack((
-            np.random.randint(0, height, size=num_pts[i]),
-            np.random.randint(0, width, size=num_pts[i]),
-        ), axis=1)
+        p = np.random.randint((height, width), size=(num_pts[i], 2))
         q = p + np.random.randint(-20, 20, size=p.shape)
 
         p = p.astype('float64')
@@ -303,14 +290,14 @@ def run_benckmark(i):
 
     times = []
     for _ in range(3):
-        image = torch.randint(0, 256, sizes[i]).to(device)
+        image = torch.randint(0, 256, sizes[i], dtype=torch.uint8, device=device)
         height, width = image.shape[:2]
+
         p = torch.stack((
-            torch.randint(0, height, size=(num_pts[i],)),
-            torch.randint(0, width, size=(num_pts[i],)),
+            torch.randint(0, height, size=(num_pts[i],), dtype=torch.float32),
+            torch.randint(0, width, size=(num_pts[i],), dtype=torch.float32),
         ), dim=1).to(device)
         q = p + torch.randint(-20, 20, size=p.shape).to(device)
-
         start = time.time()
         _ = benchmark_torch(image, p, q)
         elapse = time.time() - start
@@ -319,8 +306,8 @@ def run_benckmark(i):
 
 
 if __name__ == "__main__":
-    demo()
-    # demo_torch()
+    # demo()
+    demo_torch()
     # demo2()
     # demo3()
 
