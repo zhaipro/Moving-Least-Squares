@@ -82,11 +82,11 @@ def demo_torch():
     p = torch.from_numpy(np.array([
         [155, 30], [155, 125], [155, 225],
         [235, 100], [235, 160], [295, 85], [293, 180]
-    ], dtype='float32'))
+    ], dtype='float32')).to(device)
     q = torch.from_numpy(np.array([
         [211, 42], [155, 125], [100, 235],
         [235, 80], [235, 140], [295, 85], [295, 180]
-    ], dtype='float32'))
+    ], dtype='float32')).to(device)
 
     image = torch.from_numpy(np.array(Image.open("images/toy.jpg"))).to(device)
 
@@ -103,7 +103,7 @@ def demo_torch():
     aug3 = image[rigid[..., 0], rigid[..., 1]]
 
     fig, ax = plt.subplots(1, 4, figsize=(12, 4))
-    ax[0].imshow(image)
+    ax[0].imshow(image.cpu())
     ax[0].set_title("Original Image")
     ax[1].imshow(aug1.cpu().numpy())
     ax[1].set_title("Affine Deformation")

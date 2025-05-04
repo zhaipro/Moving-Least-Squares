@@ -30,6 +30,9 @@ Note:
 import torch
 
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
+
+
 def mls_deformation(vy, vx, p, q, alpha=1.0, eps=1e-8, solver=None):
     """ Deformation
 
@@ -79,7 +82,7 @@ def mls_deformation(vy, vx, p, q, alpha=1.0, eps=1e-8, solver=None):
     transformers = torch.view_as_real(_transformers)    # 进化回实数域？
 
     # Removed the points outside the border
-    torch.clamp(transformers, torch.Tensor([0]), torch.Tensor([grow - 1, gcol - 1]), out=transformers)
+    torch.clamp(transformers, torch.Tensor([0]).to(device), torch.Tensor([grow - 1, gcol - 1]).to(device), out=transformers)
 
     transformers = transformers.reshape(grow, gcol, 2)
 
