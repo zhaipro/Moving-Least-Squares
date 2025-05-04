@@ -17,65 +17,16 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-try:
-    import torch    # Install PyTorch first: https://pytorch.org/get-started/locally/
-    from img_utils_pytorch import (
-        mls_affine_deformation as mls_affine_deformation_pt,
-        mls_similarity_deformation as mls_similarity_deformation_pt,
-        mls_rigid_deformation as mls_rigid_deformation_pt,
-    )
-    device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
-except ImportError as e:
-    print(e)
+import torch    # Install PyTorch first: https://pytorch.org/get-started/locally/
+from img_utils_pytorch import mls_affine_deformation, mls_similarity_deformation, mls_rigid_deformation
+device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
-from img_utils import (
-    mls_affine_deformation,
-    mls_similarity_deformation,
-    mls_rigid_deformation
-)
 
 from PIL import Image
 
 
-def demo():
-    p = np.array([
-        [155, 30], [155, 125], [155, 225],
-        [235, 100], [235, 160], [295, 85], [293, 180]
-    ], dtype='float64')
-    q = np.array([
-        [211, 42], [155, 125], [100, 235],
-        [235, 80], [235, 140], [295, 85], [295, 180]
-    ], dtype='float64')
-
-    image = np.array(Image.open("images/toy.jpg"))
-
-    height, width, _ = image.shape
-    vx, vy = np.ogrid[:height - 1:height * 1j, :width - 1:width * 1j]
-
-    affine = mls_affine_deformation(vy, vx, p, q, alpha=1)
-    aug1 = image[affine[..., 0], affine[..., 1]]
-
-    similar = mls_similarity_deformation(vy, vx, p, q, alpha=1)
-    aug2 = image[similar[..., 0], similar[..., 1]]
-
-    rigid = mls_rigid_deformation(vy, vx, p, q, alpha=1)
-    aug3 = image[rigid[..., 0], rigid[..., 1]]
-
-    fig, ax = plt.subplots(1, 4, figsize=(12, 4))
-    ax[0].imshow(image)
-    ax[0].set_title("Original Image")
-    ax[1].imshow(aug1)
-    ax[1].set_title("Affine Deformation")
-    ax[2].imshow(aug2)
-    ax[2].set_title("Similarity Deformation")
-    ax[3].imshow(aug3)
-    ax[3].set_title("Rigid Deformation")
-
-    for x in ax.flat:
-        x.axis("off")
-
-    plt.tight_layout(w_pad=0.1)
-    plt.show()
+def imread(fn):
+    return torch.from_numpy(np.array(Image.open(fn))).to(device)
 
 
 def demo_torch():
@@ -88,28 +39,28 @@ def demo_torch():
         [235, 80], [235, 140], [295, 85], [295, 180]
     ], dtype='float32')).to(device)
 
-    image = torch.from_numpy(np.array(Image.open("images/toy.jpg"))).to(device)
+    image = imread('images/toy.jpg')
 
     height, width, _ = image.shape
     vx = torch.arange(height, dtype=torch.float32, device=device)
     vy = torch.arange(width, dtype=torch.float32, device=device).reshape((1, -1))
-    affine = mls_affine_deformation_pt(vy, vx, p, q, alpha=1)
+    affine = mls_affine_deformation(vy, vx, p, q, alpha=1)
     aug1 = image[affine[..., 0], affine[..., 1]]
 
-    similar = mls_similarity_deformation_pt(vy, vx, p, q, alpha=1)
+    similar = mls_similarity_deformation(vy, vx, p, q, alpha=1)
     aug2 = image[similar[..., 0], similar[..., 1]]
 
-    rigid = mls_rigid_deformation_pt(vy, vx, p, q, alpha=1)
+    rigid = mls_rigid_deformation(vy, vx, p, q, alpha=1)
     aug3 = image[rigid[..., 0], rigid[..., 1]]
 
     fig, ax = plt.subplots(1, 4, figsize=(12, 4))
     ax[0].imshow(image.cpu())
     ax[0].set_title("Original Image")
-    ax[1].imshow(aug1.cpu().numpy())
+    ax[1].imshow(aug1.cpu())
     ax[1].set_title("Affine Deformation")
-    ax[2].imshow(aug2.cpu().numpy())
+    ax[2].imshow(aug2.cpu())
     ax[2].set_title("Similarity Deformation")
-    ax[3].imshow(aug3.cpu().numpy())
+    ax[3].imshow(aug3.cpu())
     ax[3].set_title("Rigid Deformation")
 
     for x in ax.flat:
@@ -121,47 +72,49 @@ def demo_torch():
 
 def demo2():
     """ Smiled Monalisa """
-    np.random.seed(1234)
+    # np.random.seed(1234)
 
-    image = np.array(Image.open("images/monalisa.jpg"))
+    image = imread("images/monalisa.jpg")
     height, width, _ = image.shape
 
     # Define deformation grid
-    gridX = np.arange(width, dtype=np.int16)
-    gridY = np.arange(height, dtype=np.int16)
-    vy, vx = np.meshgrid(gridX, gridY)
+
+    height, width, _ = image.shape
+    vx = torch.arange(height, dtype=torch.float32, device=device)
+    vy = torch.arange(width, dtype=torch.float32, device=device).reshape((1, -1))
 
     # ================ Control points group 1 (manually specified) ==================
-    p1 = np.array([[0, 0], [517, 0], [0, 798], [517, 798],
+    p1 = torch.from_numpy(np.array([[0, 0], [517, 0], [0, 798], [517, 798],
         [140, 186], [135, 295], [181, 208], [181, 261], [203, 184], [202, 304], [225, 213],
         [225, 243], [244, 211], [244, 253], [254, 195], [281, 232], [252, 285]
-    ])
-    q1 = np.array([[0, 0], [517, 0], [0, 798], [517, 798],
+    ], dtype='float32')).to(device)
+    q1 = torch.from_numpy(np.array([[0, 0], [517, 0], [0, 798], [517, 798],
         [140, 186], [135, 295], [181, 208], [181, 261], [203, 184], [202, 304], [225, 213],
         [225, 243], [238, 207], [237, 261], [253, 199], [281, 232], [249, 279]
-    ])
+    ], dtype='float32')).to(device)
 
     rigid1 = mls_rigid_deformation(vy, vx, p1, q1, alpha=1)
-    aug1 = np.ones_like(image)
-    aug1[vx, vy] = image[tuple(rigid1)]
+
+    aug1 = image[rigid1[..., 0], rigid1[..., 1]]
 
     # ====================== Control points group 1 (random) =======================
     p2 = np.stack((
         np.random.randint(0, height, size=13),
         np.random.randint(0, width, size=13),
-    ), axis=1)
-    q2 = p2 + np.random.randint(-20, 20, size=p2.shape)
+    ), axis=1).astype('float32')
+    q2 = p2 + np.random.randint(-20, 20, size=p2.shape).astype('float32')
+    p2 = torch.from_numpy(p2).to(device)
+    q2 = torch.from_numpy(q2).to(device)
 
-    rigid2 = mls_rigid_deformation_pt(vy, vx, p2, q2, alpha=1)
-    aug2 = np.ones_like(image)
-    aug2[vx, vy] = image[tuple(rigid2)]
+    rigid2 = mls_rigid_deformation(vy, vx, p2, q2, alpha=1)
+    aug2 = image[rigid2[..., 0], rigid2[..., 1]]
 
     fig, ax = plt.subplots(1, 3, figsize=(13, 6))
-    ax[0].imshow(image)
+    ax[0].imshow(image.cpu())
     ax[0].set_title("Original Image")
-    ax[1].imshow(aug1)
+    ax[1].imshow(aug1.cpu())
     ax[1].set_title("Manually specified control points")
-    ax[2].imshow(aug2)
+    ax[2].imshow(aug2.cpu())
     ax[2].set_title("Random control points")
 
     for x in ax.flat:
@@ -237,18 +190,6 @@ def demo3():
     plt.show()
 
 
-def benchmark_numpy(image, p, q):
-    height, width = image.shape[:2]
-
-    # Define deformation grid
-    vx, vy = np.ogrid[:height - 1:height * 1j, :width - 1:width * 1j]
-
-    rigid = mls_rigid_deformation(vy, vx, p, q, alpha=1)
-    aug = image[rigid[..., 0], rigid[..., 1]]
-
-    return aug
-
-
 def benchmark_torch(image, p, q):
     height, width = image.shape[:2]
 
@@ -306,9 +247,8 @@ def run_benckmark(i):
 
 
 if __name__ == "__main__":
-    demo()
-    # demo2()
+    demo2()
     # demo3()
     # demo_torch()
 
-    run_benckmark(i=3)
+    # run_benckmark(i=3)
